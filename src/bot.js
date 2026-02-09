@@ -5,7 +5,18 @@ import walletTracker from './tracker.js';
 
 class TelegramBotService {
   constructor() {
-    this.bot = new TelegramBot(config.telegramToken, { polling: true });
+    this.bot = new TelegramBot(config.telegramToken, {
+      polling: {
+        interval: 1000,
+        autoStart: true,
+        params: {
+          timeout: 30
+        }
+      },
+      request: {
+        timeout: 40000
+      }
+    });
     this.setupCommands();
     this.setupCallbacks();
   }
@@ -283,9 +294,15 @@ Once configured, all buy/sell signals will be posted to both your private chat a
   }
 
   setupCallbacks() {
-    // Handle errors
+    // Handle polling errors gracefully - ETIMEDOUT is normal on VPS networks, library auto-retries
     this.bot.on('polling_error', (error) => {
-      console.error('Polling error:', error);
+      const msg = error?.message || '';
+      if (msg.includes('ETIMEDOUT') || msg.includes('EFATAL') || msg.includes('ECONNRESET')) {
+        // Network hiccup — library auto-recovers, just log briefly
+        console.log('⚡ Telegram polling reconnecting...');
+      } else {
+        console.error('Polling error:', error.message);
+      }
     });
   }
 
